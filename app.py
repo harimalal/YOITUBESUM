@@ -9,6 +9,8 @@ st.set_page_config(page_title="IA Vidéo Summarizer", page_icon="📺")
 API_KEY = st.secrets["GEMINI_KEY"]
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
 
 def extract_video_id(url):
     pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})'
