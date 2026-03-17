@@ -17,15 +17,30 @@ def extract_video_id(url):
     """Extrait l'ID de la vidéo d'une URL YouTube."""
     pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})'
     match = re.search(pattern, url)
-    return match.group(1) if match else None
+    return match.group(1) if match else de
 
 def get_transcript(video_id):
-    """Récupère le texte de la vidéo."""
+    """Récupère le texte de la vidéo de manière robuste."""
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['fr', 'en'])
-        return " ".join([t['text'] for t in transcript_list])
+        # On récupère la liste de tous les sous-titres dispo
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
+        # On essaie d'abord le français, sinon l'anglais, sinon le premier dispo
+        try:
+            transcript = transcript_list.find_transcript(['fr'])
+        except:
+            try:
+                transcript = transcript_list.find_transcript(['en'])
+            except:
+                transcript = transcript_list.get_generated_transcript(['fr', 'en'])
+                
+        data = transcript.fetch()
+        return " ".join([t['text'] for t in data])
+        
     except Exception as e:
+        print(f"Erreur technique : {e}")
         return None
+        
 
 def generate_ai_summary(transcript, video_id):
     """Envoie le texte à Gemini pour la synthèse formatée."""
