@@ -1,14 +1,14 @@
 import streamlit as st
 import google.generativeai as genai
 from youtube_transcript_api import YouTubeTranscriptApi
-import re
+import re 
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="IA Vidéo Summarizer", page_icon="📺")
 
 # Configure ton API Key ici
 # (Astuce : en production, utilise st.secrets)
-API_KEY = "TA_CLE_API_GEMINI_ICI" 
+API_KEY = st.secrets["GEMINI_KEY"] 
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
