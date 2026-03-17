@@ -1,90 +1,62 @@
 import streamlit as st
 import google.generativeai as genai
 from youtube_transcript_api import YouTubeTranscriptApi
-import re 
+import re
 
-# --- CONFIGURATION ---
 st.set_page_config(page_title="IA Vidéo Summarizer", page_icon="📺")
 
-# Configure ton API Key ici
-# (Astuce : en production, utilise st.secrets)
-API_KEY = st.secrets["GEMINI_KEY"] 
+# Config API
+API_KEY = st.secrets["GEMINI_KEY"]
 genai.configure(api_key=API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- FONCTIONS UTILES ---
 def extract_video_id(url):
-    """Extrait l'ID de la vidéo d'une URL YouTube."""
     pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})'
     match = re.search(pattern, url)
-    return match.group(1) if match else de
+    return match.group(1) if match else None
 
 def get_transcript(video_id):
-    """Récupère le texte de la vidéo de manière robuste."""
     try:
-        # On récupère la liste de tous les sous-titres dispo
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        
-        # On essaie d'abord le français, sinon l'anglais, sinon le premier dispo
-        try:
-            transcript = transcript_list.find_transcript(['fr'])
-        except:
-            try:
-                transcript = transcript_list.find_transcript(['en'])
-            except:
-                transcript = transcript_list.get_generated_transcript(['fr', 'en'])
-                
+        # On essaie de récupérer n'importe quel sous-titre dispo (fr ou en)
+        t_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        transcript = t_list.find_transcript(['fr', 'en'])
         data = transcript.fetch()
         return " ".join([t['text'] for t in data])
-        
-    except Exception as e:
-        print(f"Erreur technique : {e}")
+    except:
         return None
-        
 
-def generate_ai_summary(transcript, video_id):
-    """Envoie le texte à Gemini pour la synthèse formatée."""
-    prompt = f"""
-    Tu es un expert en analyse de contenu. À partir de la transcription suivante, crée une synthèse riche et structurée.
-    
-    TRANSCRIPTION : {transcript}
-    
-    FORMAT ATTENDU :
-    1. # Titre de la vidéo (trouve un titre percutant)
-    2. ![Vignette](https://img.youtube.com/vi/{video_id}/0.jpg)
-    3. ## Sujet : (Un résumé global de l'intention)
-    4. ## Sommaire : (Liste à puces des grands thèmes)
-    5. ## Développement : (Développe chaque point du sommaire avec des détails, des exemples et des citations marquantes du texte)
-    6. ## Key Takeaways : (Les points essentiels à retenir)
-    
-    Réponds en français, avec un ton pro et inspirant.
-    """
-    response = model.generate_content(prompt)
-    return response.text
+st.title("📺 YouTube Magic Summarizer")
 
-# --- INTERFACE STREAMLIT ---
-st.title("📺 Synthétiseur de Vidéos YouTube")
-st.write("Collez un lien pour obtenir une synthèse complète avec structure, citations et vignette.")
-
-url = st.text_input("Lien YouTube :", placeholder="https://www.youtube.com/watch?v=...")
+# --- INTERFACE ---
+url = st.text_input("1. Lien de la vidéo :")
+manual_text = st.text_area("2. (Optionnel) Colle le texte ici si l'automatique échoue :", height=150)
 
 if st.button("Générer la synthèse"):
-    if not url:
-        st.warning("Veuillez entrer une URL.")
-    else:
-        video_id = extract_video_id(url)
-        if not video_id:
-            st.error("URL YouTube invalide.")
-        else:
-            with st.spinner("L'IA analyse la vidéo (récupération du texte et rédaction)..."):
-                # Étape 1 : Récupérer le texte
-                text = get_transcript(video_id)
-                
-                if text:
-                    # Étape 2 : Envoyer à l'IA
-                    summary = generate_ai_summary(text, video_id)
-                    st.markdown("---")
-                    st.markdown(summary)
-                else:
-                    st.error("Impossible de récupérer les sous-titres de cette vidéo (ils sont peut-être désactivés).")
+    video_id = extract_video_id(url) if url else "default"
+    text_to_analyze = None
 
+    # Priorité au texte manuel, sinon automatique
+    if manual_text:
+        text_to_analyze = manual_text
+    elif url:
+        with st.spinner("Tentative de récupération automatique..."):
+            text_to_analyze = get_transcript(video_id)
+    
+    if text_to_analyze:
+        with st.spinner("L'IA rédige votre synthèse..."):
+            prompt = f"""
+            Transcription : {text_to_analyze}
+            Fais une synthèse structurée en français :
+            1. Titre percutant
+            2. ![Vignette](https://img.youtube.com/vi/{video_id}/0.jpg)
+            3. Sujet (résumé global)
+            4. Sommaire (points clés)
+            5. Développement détaillé (avec exemples et citations du texte)
+            6. Key Takeaways
+            """
+            response = model.generate_content(prompt)
+            st.markdown(response.text)
+    else:
+        st.error("Désolé, YouTube bloque la récupération automatique sur ce serveur.")
+        st.info("💡 ASTUCE : Ouvre la vidéo sur ton tel, va dans 'Description' > 'Afficher la transcription', copie tout le texte et colle-le dans la case 'Optionnel' ci-dessus !")
+        
