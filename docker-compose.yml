@@ -1,0 +1,9 @@
+services:
+  yoitubesum:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - GEMINI_KEY=${GEMINI_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+    restart: unless-stopped
